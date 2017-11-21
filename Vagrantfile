@@ -12,7 +12,7 @@ Vagrant.configure("2") do |config|
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
-  config.vm.box = "centos7"
+  config.vm.box = "centos74_ssl"
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
@@ -32,7 +32,7 @@ Vagrant.configure("2") do |config|
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
-  config.vm.network "private_network", ip: "192.168.33.10"
+  # config.vm.network "private_network", ip: "192.168.33.10"
 
   # Create a public network, which generally matched to bridged network.
   # Bridged networks make the machine appear as another physical device on
@@ -49,14 +49,11 @@ Vagrant.configure("2") do |config|
   # backing providers for Vagrant. These expose provider-specific options.
   # Example for VirtualBox:
   #
-  # config.vm.provider "virtualbox" do |vb|
-  #   # Display the VirtualBox GUI when booting the machine
-  #   vb.gui = true
-  #
-  #   # Customize the amount of memory on the VM:
-  #   vb.memory = "1024"
-  # end
-  #
+  config.vm.provider "virtualbox" do |vb|
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
+  end
+
   # View the documentation for the provider you are using for more
   # information on available options.
 
@@ -72,14 +69,14 @@ Vagrant.configure("2") do |config|
     # application name constant
     # if firewall activated, disable and shutdown firewall
     FIREWALLD_STATUS=`systemctl status firewalld | grep inactive`
-    if [ ! -z "$FIREWALLD_STATUS" ]; then
+    if [ -z "$FIREWALLD_STATUS" ]; then
       echo "---------------------------- stop firewalld -----------------------------------"
       systemctl stop firewalld
     fi
     FIREWALLD_DISABLE=`systemctl status firewalld | grep disabled`
-    if [ ! -z "$FIREWALLD_DISABLE" ]; then
+    if [ -z "$FIREWALLD_DISABLE" ]; then
       echo "---------------------------- disable firewalld -----------------------------------"
-      systemctl disabled firewalld
+      systemctl disable firewalld
     fi
     WGET=`rpm -qa wget`
     if [ -z "$WGET" ]; then
@@ -129,7 +126,18 @@ Vagrant.configure("2") do |config|
     PHP="/bin/php"
     if [ ! -f $PHP ]; then
       echo "---------------------------- install php -----------------------------------"
-      yum install -y --enablerepo=remi,remi-php71 php php-devel php-mbstring php-pdo php-gd php-process php-mysqlnd composer
+      yum install -y --enablerepo=remi,remi-php71 php php-devel php-mbstring php-pdo php-gd php-process php-mysqlnd php-pear composer
+    fi
+    XDEBUG=`php -i | grep xdebug`
+    if [ -z $XDEBUG ]; then
+      echo "---------------------------- install xdebug -----------------------------------"
+      pecl install xdebug
+      sed -i -e '1685a [xdebug]\n' /etc/php.ini
+      sed -i -e '1686a zend_extension = /usr/lib64/php/modules/xdebug.so' /etc/php.ini
+      sed -i -e '1687a xdebug.remote_autostart = 1' /etc/php.ini
+      sed -i -e '1688a xdebug.remote_enable = 1' /etc/php.ini
+      sed -i -e '1689a xdebug.remote_host = 10.0.2.2' /etc/php.ini
+      sed -i -e '1690a xdebug.remote_port = 9001' /etc/php.ini
     fi
     PHPFPM="/usr/sbin/php-fpm"
     if [ ! -f $PHPFPM ]; then
